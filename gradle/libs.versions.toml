@@ -19,6 +19,7 @@ constraintlayout = "2.2.1"
 composeBom = "2024.09.00"
 composeMaterial = "1.2.1"
 composeFoundation = "1.2.1"
+securityCrypto = "1.1.0"
 spotifyAppRemote = "0.7.2"
 spotifyAppRemoteVersion = "1.2.5"
 wearToolingPreview = "1.0.0"
@@ -28,6 +29,7 @@ coreSplashscreen = "1.0.1"
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-localbroadcastmanager = { module = "androidx.localbroadcastmanager:localbroadcastmanager", version.ref = "localbroadcastmanager" }
+androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 auth = { module = "com.spotify.android:auth", version.ref = "auth" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 gson-v2101 = { module = "com.google.code.gson:gson", version.ref = "gsonVersion" }

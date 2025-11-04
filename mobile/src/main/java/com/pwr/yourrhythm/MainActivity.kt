@@ -5,23 +5,29 @@ import android.os.Bundle
 import android.util.Base64
 import android.util.Log
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import com.pwr.yourrhythm.fetchMusicService.SpotifyAuthManager
 import com.pwr.yourrhythm.fetchMusicService.FindSongService
 import com.pwr.yourrhythm.heartRateService.HeartRateViewModel
+import com.pwr.yourrhythm.security.TokenEncryptionHelper.getAccessToken
+import com.pwr.yourrhythm.security.TokenEncryptionHelper.getRefreshToken
 import com.spotify.android.appremote.api.ConnectionParams
 import com.spotify.android.appremote.api.Connector
 import com.spotify.android.appremote.api.SpotifyAppRemote
 import com.spotify.sdk.android.auth.AuthorizationClient
 import com.spotify.sdk.android.auth.AuthorizationRequest
 import com.spotify.sdk.android.auth.AuthorizationResponse
+import com.pwr.yourrhythm.security.TokenEncryptionHelper.saveTokens
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
 import kotlinx.coroutines.*
+import androidx.core.content.edit
+import com.pwr.yourrhythm.security.TokenEncryptionHelper.saveAccessToken
 
 class MainActivity : AppCompatActivity() {
 
@@ -30,8 +36,6 @@ class MainActivity : AppCompatActivity() {
     private val apiKey = BuildConfig.GETSONG_API_KEY
     private val redirectUri = "com.pwr.yourrhythm://callback"
     private val AUTH_CODE_REQUEST_CODE = 0x11
-    private var accessToken: String? = null
-    private var refreshToken: String? = null
     private var spotifyAppRemote: SpotifyAppRemote? = null
     private lateinit var spotifyAuthManager : SpotifyAuthManager
     private lateinit var findSongService: FindSongService
@@ -74,7 +78,8 @@ class MainActivity : AppCompatActivity() {
                         }
                         // 4. Zagranie piosenki
                         val firstSong = songs.firstOrNull()
-                        if (firstSong != null && accessToken != null) {
+                        val accessToken = getAccessToken(this@MainActivity)
+                        if (firstSong != null && getAccessToken(this@MainActivity) != null) {
                             findSongService.searchTrackOnSpotify(firstSong.title, firstSong.artist, accessToken) { trackId ->
                                 if (trackId != null) {
                                     firstSong.trackId = trackId
@@ -136,10 +141,9 @@ class MainActivity : AppCompatActivity() {
 
             override fun onResponse(call: Call, response: Response) {
                 val json = JSONObject(response.body?.string() ?: "")
-                accessToken = json.getString("access_token")
-                refreshToken = json.getString("refresh_token")
-                Log.d("Spotify", "Access token: $accessToken")
-                Log.d("Spotify", "Refresh token: $refreshToken")
+                saveTokens(this@MainActivity,
+                    json.getString("access_token"),
+                    json.getString("refresh_token"))
                 startRefreshingToken()
                 runOnUiThread { connectToSpotifyAppRemote() }
             }
@@ -149,9 +153,9 @@ class MainActivity : AppCompatActivity() {
     private fun startRefreshingToken() {
         scope.launch {
             while (isActive) {
-                spotifyAuthManager.refreshAccessToken(refreshToken) { newToken ->
+                spotifyAuthManager.refreshAccessToken(getRefreshToken(this@MainActivity)) { newToken ->
                     if (newToken != null) {
-                        accessToken = newToken
+                        saveAccessToken(this@MainActivity, newToken)
                     }
                 }
                 delay(20_000)
@@ -192,6 +196,11 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         scope.cancel()
+
+        // Clear Access Tokens
+        val prefs = getSharedPreferences("secure_prefs", MODE_PRIVATE)
+        prefs.edit { clear() }
+        Toast.makeText(this, "Tokens cleared", Toast.LENGTH_SHORT).show()
     }
 
 }

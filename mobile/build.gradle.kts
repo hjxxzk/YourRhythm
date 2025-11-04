@@ -68,11 +68,13 @@ dependencies {
     // Spotify API
     implementation(files("../mobile/libs/spotify-app-remote-release-0.8.0.aar"))
     implementation(files("../mobile/libs/spotify-auth-release-2.1.0.aar"))
-//    implementation("com.spotify.android:spotify-app-remote:1.2.5")
     implementation(libs.gson.v2101)
 
     // HTTP Requests
     implementation(libs.okhttp.v4110)
+
+    // DATA ENCRYPTION
+    implementation(libs.androidx.security.crypto)
 
     implementation(libs.material)
     implementation(libs.androidx.activity)
