@@ -40,7 +40,9 @@ android {
 }
 
 dependencies {
+    // DATA LAYER API
     implementation(libs.play.services.wearable)
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)

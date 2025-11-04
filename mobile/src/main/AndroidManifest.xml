@@ -20,6 +20,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service
+            android:name=".heartRateService.HeartRateListenerService"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:path="/heartrate" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".musicPlayer.MusicPlayerService"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
 </manifest>
