@@ -6,6 +6,8 @@ import android.util.Base64
 import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import com.pwr.yourrhythm.fetchMusicService.SpotifyAuthManager
@@ -28,8 +30,10 @@ import java.io.IOException
 import kotlinx.coroutines.*
 import androidx.core.content.edit
 import com.pwr.yourrhythm.security.TokenEncryptionHelper.saveAccessToken
+import com.pwr.yourrhythm.theme.HomePage
+import kotlin.math.abs
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
 
     private val clientId = BuildConfig.SPOTIFY_CLIENT_ID
     private val clientSecret = BuildConfig.SPOTIFY_CLIENT_SECRET
@@ -42,7 +46,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var heartRateText: TextView
     private val heartRateViewModel: HeartRateViewModel by viewModels()
     private val scope = CoroutineScope(Dispatchers.IO + Job())
-    private val songsList = mutableListOf<Song>()
+    private var songsList = mutableListOf<Song>()
+    private var heartRate : Float = 0F
     private var isSpotifyConnected = false
     data class Song(
         val title: String,
@@ -53,7 +58,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContent {
+            HomePage()
+        }
 
         spotifyAuthManager = SpotifyAuthManager()
         findSongService = FindSongService()
@@ -62,14 +69,13 @@ class MainActivity : AppCompatActivity() {
         authenticateSpotify()
 
         //3. Połaczenie się z zgearkiem
-        heartRateText = findViewById(R.id.heartRateTextView)
-
+        //heartRateText = findViewById(R.id.heartRateTextView)
         // 2. Odebranie danych z zegarka
         heartRateViewModel.heartRate.observe(this) { value ->
             if (value != null && value > 0f) {
                 heartRateText.text = "❤️ $value bpm"
 
-                if(isSpotifyConnected) {
+                if(shouldSongChange(value) && isSpotifyConnected) {
                     findSongService.getSongsByBpm(value, apiKey, limit = 5) { songs ->
                         songsList.clear()
                         songsList.addAll(songs)
@@ -99,7 +105,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun authenticateSpotify() {
         val request = AuthorizationRequest.Builder(clientId, AuthorizationResponse.Type.CODE, redirectUri)
-            .setScopes(arrayOf("user-read-email", "streaming", "user-modify-playback-state"))
+            .setScopes(arrayOf("streaming", "user-modify-playback-state"))
             .setShowDialog(true)
             .build()
         AuthorizationClient.openLoginActivity(this, AUTH_CODE_REQUEST_CODE, request)
@@ -158,7 +164,7 @@ class MainActivity : AppCompatActivity() {
                         saveAccessToken(this@MainActivity, newToken)
                     }
                 }
-                delay(20_000)
+                delay(25 * 60 * 1000)
             }
         }
     }
@@ -203,4 +209,34 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "Tokens cleared", Toast.LENGTH_SHORT).show()
     }
 
+    private var volatilityIndex : Float = 0F
+    private val VOLATILITY_THRESHOLD = 5F
+
+    fun shouldSongChange(newHeartRate : Float) : Boolean {
+        if(isFirstHeartRateMeasurement()) {
+            heartRate = newHeartRate
+            return true
+        }
+        return checkVolatility(newHeartRate)
+    }
+
+    fun isFirstHeartRateMeasurement(): Boolean {
+        return heartRate == 0F
+    }
+
+    fun isDifferenceHigherThanThreshold(): Boolean {
+        return abs(volatilityIndex) >= VOLATILITY_THRESHOLD
+    }
+
+    fun checkVolatility(newHeartRate : Float): Boolean {
+        val heartRateDifference = heartRate - newHeartRate
+        volatilityIndex += heartRateDifference
+        heartRate = newHeartRate
+
+        if(isDifferenceHigherThanThreshold()) {
+            volatilityIndex = 0F
+            return true
+        }
+        return false
+    }
 }

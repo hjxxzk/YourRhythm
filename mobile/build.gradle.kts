@@ -14,6 +14,7 @@ val SPOTIFY_CLIENT_SECRET: String = localProperties.getProperty("SPOTIFY_CLIENT_
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
@@ -22,6 +23,7 @@ android {
 
     buildFeatures {
         buildConfig = true
+        compose = true
     }
 
     defaultConfig {
@@ -38,7 +40,6 @@ android {
         buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"$SPOTIFY_CLIENT_ID\"")
         buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"$SPOTIFY_CLIENT_SECRET\"")
     }
-
 
     buildTypes {
         release {
@@ -75,6 +76,40 @@ dependencies {
 
     // DATA ENCRYPTION
     implementation(libs.androidx.security.crypto)
+
+    // COMPOSE
+    val composeBom = platform("androidx.compose:compose-bom:2025.10.01")
+    implementation(composeBom)
+    androidTestImplementation(composeBom)
+
+    // Choose one of the following:
+    // Material Design 3
+    implementation(libs.androidx.compose.material3)
+    // or skip Material Design and build directly on top of foundational components
+    implementation(libs.androidx.foundation)
+    // or only import the main APIs for the underlying toolkit systems,
+    // such as input and measurement/layout
+    implementation(libs.androidx.ui)
+
+    // Android Studio Preview support
+    implementation(libs.androidx.ui.tooling.preview)
+    debugImplementation(libs.androidx.ui.tooling)
+
+    // UI Tests
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.test.manifest)
+
+    // Optional - Add window size utils
+    implementation(libs.androidx.compose.adaptive)
+
+    // Optional - Integration with activities
+    implementation(libs.androidx.activity.compose)
+    // Optional - Integration with ViewModels
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    // Optional - Integration with LiveData
+    implementation("androidx.compose.runtime:runtime-livedata")
+    // Optional - Integration with RxJava
+    implementation("androidx.compose.runtime:runtime-rxjava2")
 
     implementation(libs.material)
     implementation(libs.androidx.activity)
