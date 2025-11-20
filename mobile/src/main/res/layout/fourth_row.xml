@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- res/layout/song_item.xml -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:gravity="center">
+
+    <include
+        layout="@layout/genre_item"
+        android:id="@+id/latin"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:layout_marginEnd="8dp"/>
+
+    <include
+        layout="@layout/genre_item"
+        android:id="@+id/pop"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:layout_marginEnd="8dp"/>
+
+    <include
+        layout="@layout/genre_item"
+        android:id="@+id/rap"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:layout_marginEnd="8dp"/>
+
+    <include
+        layout="@layout/genre_item"
+        android:id="@+id/reggae"/>
+</LinearLayout>

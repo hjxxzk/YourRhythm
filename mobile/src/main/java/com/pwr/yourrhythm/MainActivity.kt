@@ -1,13 +1,14 @@
 package com.pwr.yourrhythm
 
+import android.animation.ObjectAnimator
 import android.content.Intent
 import android.os.Bundle
 import android.util.Base64
 import android.util.Log
+import android.view.animation.LinearInterpolator
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import com.pwr.yourrhythm.fetchMusicService.SpotifyAuthManager
@@ -29,11 +30,15 @@ import org.json.JSONObject
 import java.io.IOException
 import kotlinx.coroutines.*
 import androidx.core.content.edit
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.pwr.yourrhythm.security.TokenEncryptionHelper.saveAccessToken
-import com.pwr.yourrhythm.theme.HomePage
+import com.pwr.yourrhythm.theme.CurveProgressView
+import com.pwr.yourrhythm.theme.SongAdapter
 import kotlin.math.abs
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private val clientId = BuildConfig.SPOTIFY_CLIENT_ID
     private val clientSecret = BuildConfig.SPOTIFY_CLIENT_SECRET
@@ -43,12 +48,17 @@ class MainActivity : ComponentActivity() {
     private var spotifyAppRemote: SpotifyAppRemote? = null
     private lateinit var spotifyAuthManager : SpotifyAuthManager
     private lateinit var findSongService: FindSongService
-    private lateinit var heartRateText: TextView
+    private lateinit var bpmText: TextView
     private val heartRateViewModel: HeartRateViewModel by viewModels()
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private var songsList = mutableListOf<Song>()
+    private lateinit var adapter: SongAdapter
+    private lateinit var swipeRefresh: SwipeRefreshLayout
     private var heartRate : Float = 0F
     private var isSpotifyConnected = false
+    private lateinit var rotation: ObjectAnimator
+    private var isPlaying = false
+
     data class Song(
         val title: String,
         val artist: String,
@@ -56,40 +66,71 @@ class MainActivity : ComponentActivity() {
         var img: String
     )
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            HomePage()
+
+        if (!OnboardingManager.isOnboardingCompleted(this)) {
+            startActivity(Intent(this, OnboardingActivity::class.java))
+            finish()
+            return
         }
 
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
+        adapter = SongAdapter(songsList)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.adapter = adapter
+
+        swipeRefresh = findViewById(R.id.swipeRefresh)
+
+        swipeRefresh.setOnRefreshListener {
+            refreshSongsManually()
+        }
+
+        val logo = findViewById<ImageView>(R.id.logo)
+
+        logo.setOnClickListener {
+            if(isPlaying && isSpotifyConnected) {
+                onPause()
+            } else {
+                onResume()
+            }
+        }
+
+        val curveProgress = findViewById<CurveProgressView>(R.id.curveProgress)
         spotifyAuthManager = SpotifyAuthManager()
         findSongService = FindSongService()
 
         // 1. Autoryzacja Spotify
         authenticateSpotify()
-
+        isPlaying = true
         //3. Połaczenie się z zgearkiem
-        //heartRateText = findViewById(R.id.heartRateTextView)
+        bpmText = findViewById(R.id.bpm)
         // 2. Odebranie danych z zegarka
         heartRateViewModel.heartRate.observe(this) { value ->
             if (value != null && value > 0f) {
-                heartRateText.text = "❤️ $value bpm"
+                curveProgress.setProgress(value / 200F)
+                curveProgress.setBpm(value.toInt())
 
                 if(shouldSongChange(value) && isSpotifyConnected) {
-                    findSongService.getSongsByBpm(value, apiKey, limit = 5) { songs ->
+
+                    findSongService.getSongsByBpm(value, apiKey) { songs ->
                         songsList.clear()
                         songsList.addAll(songs)
-                        songsList.forEach { song ->
-                            Log.d("MainActivity", "🎵 ${song.title} by ${song.artist}")
-                        }
+                        updateUIOnSongChange(value.toInt(), songs)
+
+
                         // 4. Zagranie piosenki
                         val firstSong = songs.firstOrNull()
                         val accessToken = getAccessToken(this@MainActivity)
                         if (firstSong != null && getAccessToken(this@MainActivity) != null) {
-                            findSongService.searchTrackOnSpotify(firstSong.title, firstSong.artist, accessToken) { trackId ->
-                                if (trackId != null) {
-                                    firstSong.trackId = trackId
+                            findSongService.searchTrackOnSpotify(firstSong.title, firstSong.artist, accessToken) { trackData ->
+                                if (trackData != null) {
+                                    firstSong.trackId = trackData.trackId
                                     playTrack(firstSong)
+
                                 } else {
                                     Log.w("MainActivity", "Nie znaleziono trackId dla ${firstSong.title}")
                                 }
@@ -98,8 +139,30 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             } else {
-                heartRateText.text = "Czekam na dane z zegarka..."
+                stopLogoRotation()
             }
+        }
+    }
+
+    private fun refreshSongsManually() {
+        swipeRefresh.isRefreshing = true
+
+        val apiKey = BuildConfig.GETSONG_API_KEY
+        findSongService.getSongsByBpm(heartRate, apiKey) { songs ->
+            songsList.clear()
+            songsList.addAll(songs)
+            runOnUiThread {
+                adapter.updateSongs(songs)
+            }
+            swipeRefresh.isRefreshing = false
+        }
+    }
+
+
+    private fun updateUIOnSongChange(bpm: Int, songs: List<Song>) {
+        runOnUiThread {
+            bpmText.text = "$bpm BPM"
+            adapter.updateSongs(songs)
         }
     }
 
@@ -189,25 +252,72 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun playTrack(song: Song?) {
-        Log.d("SpotifyAPI", "🎵 Spotify Track ID: ${song?.trackId} (${song?.title})")
-        spotifyAppRemote?.playerApi?.play("spotify:track:${song?.trackId}")
+        if(isPlaying) {
+            spotifyAppRemote?.playerApi?.play("spotify:track:${song?.trackId}")
+            startLogoRotation()
+        }
     }
 
+    override fun onResume() {
+        super.onResume()
+        spotifyAppRemote?.playerApi?.resume()
+        isPlaying = true
+        resumeLogoRotation()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isPlaying = false
+        spotifyAppRemote?.playerApi?.pause()
+        pauseLogoRotation()
+    }
 
     override fun onStop() {
         super.onStop()
+        isPlaying = false
         spotifyAppRemote?.let { SpotifyAppRemote.disconnect(it) }
+        stopLogoRotation()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         scope.cancel()
-
+        onStop()
         // Clear Access Tokens
         val prefs = getSharedPreferences("secure_prefs", MODE_PRIVATE)
         prefs.edit { clear() }
         Toast.makeText(this, "Tokens cleared", Toast.LENGTH_SHORT).show()
     }
+
+    private fun resumeLogoRotation() {
+        if (::rotation.isInitialized) {
+            rotation.start()
+        }
+    }
+
+    private fun startLogoRotation() {
+        if (!::rotation.isInitialized) {
+            val logo = findViewById<ImageView>(R.id.logo)
+            rotation = ObjectAnimator.ofFloat(logo, "rotation", 0f, 360f)
+            rotation.duration = 4000
+            rotation.repeatCount = ObjectAnimator.INFINITE
+            rotation.interpolator = LinearInterpolator()
+            rotation.start()
+        }
+    }
+
+    private fun pauseLogoRotation() {
+        if (::rotation.isInitialized) {
+            rotation.pause()
+        }
+    }
+
+    private fun stopLogoRotation() {
+        if (::rotation.isInitialized) {
+            rotation.cancel()
+        }
+    }
+
 
     private var volatilityIndex : Float = 0F
     private val VOLATILITY_THRESHOLD = 5F

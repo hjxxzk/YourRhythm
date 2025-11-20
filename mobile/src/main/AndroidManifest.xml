@@ -13,13 +13,17 @@
         android:theme="@style/Theme.YourRhythm">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:theme="@style/Theme.App.FullScreen">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".OnboardingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.App.FullScreen"/>
         <service
             android:name=".heartRateService.HeartRateListenerService"
             android:enabled="true"

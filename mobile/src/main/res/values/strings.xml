@@ -1,3 +1,28 @@
 <resources>
     <string name="app_name">YourRhythm</string>
+    <string name="save">Save</string>
+    <string name="back">Back</string>
+    <string name="welcome_to_">Welcome to</string>
+    <string name="your_rhythm">Your Rhythm!</string>
+    <string name="logo_desc">Logo</string>
+    <string name="choose_your">Choose your nickname</string>
+    <string name="fav_genre">Choose your favorite music genres</string>
+    <string name="enter_text">Type here&#8230;</string>
+    <string name="set_up">You\'re all set up!</string>
+    <string name="blues">blues</string>
+    <string name="classical">classical</string>
+    <string name="country">country</string>
+    <string name="electronic">electronic</string>
+    <string name="folk">folk</string>
+    <string name="funk">funk</string>
+    <string name="heavy_metal">heavy metal</string>
+    <string name="hip_hop">hip hop</string>
+    <string name="jazz">jazz</string>
+    <string name="latin">latin</string>
+    <string name="rb">r&amp;b</string>
+    <string name="rap">rap</string>
+    <string name="reggae">reggae</string>
+    <string name="rock">rock</string>
+    <string name="soul">soul</string>
+    <string name="world">world</string>
 </resources>

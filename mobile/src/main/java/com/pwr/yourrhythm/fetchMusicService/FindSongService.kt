@@ -8,29 +8,12 @@ import java.io.IOException
 import java.net.URLEncoder
 
 class FindSongService {
-
-    data class Artist(
-        val id: String,
-        val name: String,
-        val uri: String,
-        val genres: List<String>,
-        val from: String?,
-        val mbid: String?
-    )
-
-    data class Album(
-        val title: String,
-        val uri: String,
-        val year: Int
-    )
-
     fun getSongsByBpm(
         bpm: Float,
         apiKey: String,
-        limit: Int = 5,
         callback: (List<MainActivity.Song>) -> Unit
     ) {
-        val url = "https://api.getsong.co/tempo/?bpm=$bpm&limit=$limit&api_key=$apiKey"
+        val url = "https://api.getsong.co/tempo/?bpm=$bpm&&api_key=$apiKey"
 
         val request = Request.Builder()
             .url(url)
@@ -60,25 +43,19 @@ class FindSongService {
                 try {
                     val json = JSONObject(responseBody)
                     val tempoArray = json.getJSONArray("tempo")
-                    val songs = mutableListOf<MainActivity.Song>()
+                    val genres = listOf("rock", "pop", "dance")
+                    val songsFiltered = findSongsBasedOnPreferences(tempoArray, genres)
 
-                    for (i in 0 until tempoArray.length()) {
-                        val songObj = tempoArray.getJSONObject(i)
-                        val title = songObj.getString("song_title")
-                        val artistObj = songObj.getJSONObject("artist")
-                        val artistName = artistObj.getString("name")
-
-                        songs.add(
-                            MainActivity.Song(
-                                title = title,
-                                artist = artistName,
-                                trackId = "",
-                                img = ""
-                            )
+                    val result = songsFiltered.map { song ->
+                        MainActivity.Song(
+                            title = song.song_title,
+                            artist = song.artist.name,
+                            trackId = "",
+                            img = ""
                         )
                     }
 
-                    callback(songs)
+                    callback(result)
                 } catch (e: Exception) {
                     Log.e("GetSongAPI", "Failed to parse JSON: ${e.message}")
                     callback(emptyList())
@@ -87,11 +64,16 @@ class FindSongService {
         })
     }
 
+    data class SpotifyTrackInfo(
+        val trackId: String,
+        val imageUrl: String
+    )
+
     fun searchTrackOnSpotify(
         title: String,
         artist: String,
         spotifyToken: String?,
-        callback: (String?) -> Unit
+        callback: (SpotifyTrackInfo?) -> Unit
     ) {
         val query = URLEncoder.encode("$title $artist", "UTF-8")
         val url = "https://api.spotify.com/v1/search?q=$query&type=track&limit=1"
@@ -124,8 +106,15 @@ class FindSongService {
                         if (items.length() > 0) {
                             val track = items.getJSONObject(0)
                             val trackId = track.getString("id")
-                            Log.d("SpotifyAPI", "✅ Found Spotify ID: $trackId for $title by $artist")
-                            callback(trackId)
+                            val images = track.getJSONObject("album").getJSONArray("images")
+                            val imageUrl = images.getJSONObject(0).getString("url")
+
+                            callback(
+                                SpotifyTrackInfo(
+                                    trackId = trackId,
+                                    imageUrl = imageUrl
+                                )
+                            )
                         } else {
                             Log.w("SpotifyAPI", "⚠️ No match found for $title by $artist")
                             callback(null)

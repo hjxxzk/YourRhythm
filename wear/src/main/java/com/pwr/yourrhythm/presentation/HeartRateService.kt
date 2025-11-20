@@ -72,6 +72,7 @@ class HeartRateService : Service(), SensorEventListener {
     }
 
     private fun sendHeartRateToPhone(heartRate: Float) {
+        val timestamp1 = System.currentTimeMillis()
         val message = heartRate.toString().toByteArray()
         Thread {
             try {
@@ -80,7 +81,8 @@ class HeartRateService : Service(), SensorEventListener {
                     Wearable.getMessageClient(this)
                         .sendMessage(node.id, "/heartrate", message)
                         .addOnSuccessListener {
-                            Log.d("Wear", "Sent heart rate: $heartRate to ${node.displayName}")
+                            val timestamp2 = System.currentTimeMillis()
+                            Log.d("Wear", "${timestamp2 - timestamp1}")
                         }
                         .addOnFailureListener {
                             Log.e("Wear", "Failed to send heart rate", it)
