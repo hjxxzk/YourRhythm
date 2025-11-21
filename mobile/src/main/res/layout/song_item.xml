@@ -45,6 +45,7 @@
             android:textAlignment="viewStart"
             android:textColor="#000"
             android:textSize="12sp"
+            android:maxLines="1"
             android:ellipsize="end" />
 
         <TextView
@@ -57,6 +58,7 @@
             android:textColor="#000"
             android:textSize="16sp"
             android:textStyle="bold"
+            android:maxLines="1"
             android:ellipsize="end" />
     </LinearLayout>
 

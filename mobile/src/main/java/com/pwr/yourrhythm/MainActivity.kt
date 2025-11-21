@@ -1,10 +1,13 @@
 package com.pwr.yourrhythm
 
 import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.Intent
 import android.os.Bundle
 import android.util.Base64
 import android.util.Log
+import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -57,6 +60,7 @@ class MainActivity : AppCompatActivity() {
     private var isSpotifyConnected = false
     private var isPlaying = true
     private var currentlyPlayingTrackId: String? = null
+    private lateinit var rotationAnimator: ObjectAnimator
 
 
     data class Song(
@@ -95,9 +99,9 @@ class MainActivity : AppCompatActivity() {
 
         logo.setOnClickListener {
             if(isPlaying && isSpotifyConnected) {
-                onPause()
+                pause()
             } else {
-                onResume()
+                resume()
             }
         }
 
@@ -262,6 +266,8 @@ class MainActivity : AppCompatActivity() {
                 spotifyAppRemote = appRemote
                 Log.d("Spotify", "Connected to Spotify App Remote!")
                 isSpotifyConnected = true
+                observeSpotifyPlayback()
+                setupLogoAnimation()
             }
 
             override fun onFailure(throwable: Throwable) {
@@ -279,33 +285,67 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onResume() {
+    fun resume() {
         super.onResume()
         isPlaying = true
         spotifyAppRemote?.playerApi?.resume()
     }
 
-    override fun onPause() {
+    fun pause() {
         super.onPause()
         isPlaying = false
         spotifyAppRemote?.playerApi?.pause()
     }
 
-    override fun onStop() {
-        super.onStop()
-        isPlaying = false
-        spotifyAppRemote?.let { SpotifyAppRemote.disconnect(it) }
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         scope.cancel()
+        spotifyAppRemote?.let { SpotifyAppRemote.disconnect(it) }
         // Clear Access Tokens
         val prefs = getSharedPreferences("secure_prefs", MODE_PRIVATE)
         prefs.edit { clear() }
         Toast.makeText(this, "Tokens cleared", Toast.LENGTH_SHORT).show()
     }
 
+    // LOGO ANIMATION
+
+    private fun setupLogoAnimation() {
+        val logo = findViewById<ImageView>(R.id.logo)
+
+        rotationAnimator = ObjectAnimator.ofFloat(logo, View.ROTATION, 0f, 360f).apply {
+            duration = 4000
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = LinearInterpolator()
+        }
+    }
+
+    private fun observeSpotifyPlayback() {
+        spotifyAppRemote?.playerApi?.subscribeToPlayerState()?.setEventCallback { playerState ->
+            if (playerState.isPaused) {
+                stopLogoAnimation()
+            } else {
+                startLogoAnimation()
+            }
+        }
+    }
+
+    private fun startLogoAnimation() {
+        if (!rotationAnimator.isStarted) {
+            rotationAnimator.start()
+        } else {
+            rotationAnimator.resume()
+        }
+    }
+
+    private fun stopLogoAnimation() {
+        if (rotationAnimator.isRunning) {
+            rotationAnimator.pause()
+        }
+    }
+
+
+
+    // SHOULD STOP ALGORITHM
     private var volatilityIndex : Float = 0F
     private val VOLATILITY_THRESHOLD = 5F
 

@@ -83,13 +83,16 @@ class HeartRateService : Service(), SensorEventListener {
                         .addOnSuccessListener {
                             val timestamp2 = System.currentTimeMillis()
                             Log.d("Wear", "${timestamp2 - timestamp1}")
+                            HeartRateState.sendStatus.value = SendStatus.Success(heartRate)
                         }
                         .addOnFailureListener {
                             Log.e("Wear", "Failed to send heart rate", it)
+                            HeartRateState.sendStatus.value = SendStatus.Failure
                         }
                 }
             } catch (e: Exception) {
                 Log.e("Wear", "Error sending heart rate", e)
+                HeartRateState.sendStatus.value = SendStatus.Failure
             }
         }.start()
     }
