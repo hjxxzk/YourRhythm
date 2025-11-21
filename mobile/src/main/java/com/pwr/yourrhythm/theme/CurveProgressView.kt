@@ -65,15 +65,32 @@ class CurveProgressView @JvmOverloads constructor(
 
     fun setBpm(bpm: Int) {
         bpmValue = bpm
+        updateGradient(width)
         invalidate()
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        updateGradient(w)
+    }
+
+    private fun updateGradient(width: Int) {
+
+        val (startColor, endColor) = when {
+            bpmValue < 100 -> {
+                Color.parseColor("#22E07A") to Color.parseColor("#8AFBC0")
+            }
+            bpmValue < 151 -> {
+                Color.parseColor("#EAB308") to Color.parseColor("#FACC15")
+            }
+            else -> {
+                Color.parseColor("#EF4444") to Color.parseColor("#F87171")
+            }
+        }
 
         paintProgress.shader = LinearGradient(
-            0f, 0f, w.toFloat(), 0f,
-            intArrayOf(Color.parseColor("#22E07A"), Color.parseColor("#8AFBC0")),
+            0f, 0f, width.toFloat(), 0f,
+            intArrayOf(startColor, endColor),
             null,
             Shader.TileMode.CLAMP
         )
@@ -153,7 +170,7 @@ class CurveProgressView @JvmOverloads constructor(
             pm.getPosTan(pm.length, pos, tan)
 
             val rawTextX = pos[0]
-            val rawTextY = pos[1] - (stroke * 2.2f)
+            val rawTextY = pos[1]
 
             val angle = Math.toDegrees(atan2(tan[1].toDouble(), tan[0].toDouble())).toFloat()
 

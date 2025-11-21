@@ -1,7 +1,9 @@
 package com.pwr.yourrhythm.fetchMusicService
 
+import android.content.Context
 import android.util.Log
 import com.pwr.yourrhythm.MainActivity
+import com.pwr.yourrhythm.Preferences.getGenres
 import okhttp3.*
 import org.json.JSONObject
 import java.io.IOException
@@ -9,6 +11,7 @@ import java.net.URLEncoder
 
 class FindSongService {
     fun getSongsByBpm(
+        context: Context,
         bpm: Float,
         apiKey: String,
         callback: (List<MainActivity.Song>) -> Unit
@@ -43,7 +46,7 @@ class FindSongService {
                 try {
                     val json = JSONObject(responseBody)
                     val tempoArray = json.getJSONArray("tempo")
-                    val genres = listOf("rock", "pop", "dance")
+                    val genres = getGenres(context).toList()
                     val songsFiltered = findSongsBasedOnPreferences(tempoArray, genres)
 
                     val result = songsFiltered.map { song ->

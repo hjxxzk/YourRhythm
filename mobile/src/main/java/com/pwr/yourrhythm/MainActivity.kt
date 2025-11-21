@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Base64
 import android.util.Log
-import android.view.animation.LinearInterpolator
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -56,8 +55,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private var heartRate : Float = 0F
     private var isSpotifyConnected = false
-    private lateinit var rotation: ObjectAnimator
-    private var isPlaying = false
+    private var isPlaying = true
+    private var currentlyPlayingTrackId: String? = null
+
 
     data class Song(
         val title: String,
@@ -79,7 +79,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
-        adapter = SongAdapter(songsList)
+        adapter = SongAdapter(songsList) { song ->
+            playTrack(song)
+        }
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
 
@@ -105,7 +107,6 @@ class MainActivity : AppCompatActivity() {
 
         // 1. Autoryzacja Spotify
         authenticateSpotify()
-        isPlaying = true
         //3. Połaczenie się z zgearkiem
         bpmText = findViewById(R.id.bpm)
         // 2. Odebranie danych z zegarka
@@ -116,11 +117,10 @@ class MainActivity : AppCompatActivity() {
 
                 if(shouldSongChange(value) && isSpotifyConnected) {
 
-                    findSongService.getSongsByBpm(value, apiKey) { songs ->
+                    findSongService.getSongsByBpm(this, value, apiKey) { songs ->
                         songsList.clear()
                         songsList.addAll(songs)
-                        updateUIOnSongChange(value.toInt(), songs)
-
+                        fetchAlbumImages(songsList)
 
                         // 4. Zagranie piosenki
                         val firstSong = songs.firstOrNull()
@@ -129,7 +129,9 @@ class MainActivity : AppCompatActivity() {
                             findSongService.searchTrackOnSpotify(firstSong.title, firstSong.artist, accessToken) { trackData ->
                                 if (trackData != null) {
                                     firstSong.trackId = trackData.trackId
+                                    updateUIOnSongChange(value.toInt(), songs)
                                     playTrack(firstSong)
+                                    isPlaying = true
 
                                 } else {
                                     Log.w("MainActivity", "Nie znaleziono trackId dla ${firstSong.title}")
@@ -138,21 +140,38 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 }
-            } else {
-                stopLogoRotation()
             }
         }
     }
+
+    private fun fetchAlbumImages(songs: List<Song>) {
+        val accessToken = getAccessToken(this@MainActivity) ?: return
+        for (i in 0 until songs.size) {
+            val song = songs[i]
+            findSongService.searchTrackOnSpotify(song.title, song.artist, accessToken) { trackData ->
+                if (trackData != null) {
+                    song.trackId = trackData.trackId
+                    song.img = trackData.imageUrl
+
+                    runOnUiThread {
+                        adapter.notifyItemChanged(i)
+                    }
+                }
+            }
+        }
+    }
+
 
     private fun refreshSongsManually() {
         swipeRefresh.isRefreshing = true
 
         val apiKey = BuildConfig.GETSONG_API_KEY
-        findSongService.getSongsByBpm(heartRate, apiKey) { songs ->
+        findSongService.getSongsByBpm(this, heartRate, apiKey) { songs ->
             songsList.clear()
             songsList.addAll(songs)
             runOnUiThread {
                 adapter.updateSongs(songs)
+                fetchAlbumImages(songs)
             }
             swipeRefresh.isRefreshing = false
         }
@@ -250,74 +269,42 @@ class MainActivity : AppCompatActivity() {
             }
         })
     }
-
     private fun playTrack(song: Song?) {
-        if(isPlaying) {
-            spotifyAppRemote?.playerApi?.play("spotify:track:${song?.trackId}")
-            startLogoRotation()
+        if(isPlaying && song != null && song.trackId.isNotEmpty()) {
+            spotifyAppRemote?.playerApi?.play("spotify:track:${song.trackId}")
+            currentlyPlayingTrackId = song.trackId
+            adapter.setCurrentlyPlayingTrack(song.trackId)
+        } else {
+            Toast.makeText(this, "Couldn't play: ${song?.title}", Toast.LENGTH_SHORT).show()
         }
     }
 
     override fun onResume() {
         super.onResume()
-        spotifyAppRemote?.playerApi?.resume()
         isPlaying = true
-        resumeLogoRotation()
+        spotifyAppRemote?.playerApi?.resume()
     }
 
     override fun onPause() {
         super.onPause()
         isPlaying = false
         spotifyAppRemote?.playerApi?.pause()
-        pauseLogoRotation()
     }
 
     override fun onStop() {
         super.onStop()
         isPlaying = false
         spotifyAppRemote?.let { SpotifyAppRemote.disconnect(it) }
-        stopLogoRotation()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         scope.cancel()
-        onStop()
         // Clear Access Tokens
         val prefs = getSharedPreferences("secure_prefs", MODE_PRIVATE)
         prefs.edit { clear() }
         Toast.makeText(this, "Tokens cleared", Toast.LENGTH_SHORT).show()
     }
-
-    private fun resumeLogoRotation() {
-        if (::rotation.isInitialized) {
-            rotation.start()
-        }
-    }
-
-    private fun startLogoRotation() {
-        if (!::rotation.isInitialized) {
-            val logo = findViewById<ImageView>(R.id.logo)
-            rotation = ObjectAnimator.ofFloat(logo, "rotation", 0f, 360f)
-            rotation.duration = 4000
-            rotation.repeatCount = ObjectAnimator.INFINITE
-            rotation.interpolator = LinearInterpolator()
-            rotation.start()
-        }
-    }
-
-    private fun pauseLogoRotation() {
-        if (::rotation.isInitialized) {
-            rotation.pause()
-        }
-    }
-
-    private fun stopLogoRotation() {
-        if (::rotation.isInitialized) {
-            rotation.cancel()
-        }
-    }
-
 
     private var volatilityIndex : Float = 0F
     private val VOLATILITY_THRESHOLD = 5F
