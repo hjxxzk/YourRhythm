@@ -177,10 +177,17 @@ class CurveProgressView @JvmOverloads constructor(
             val minAllowedY = 0f + paintText.textSize / 2f + 2f
             val adjustedTextY = if (rawTextY < minAllowedY) minAllowedY else rawTextY
 
+            val offsetAboveArc = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                20f,
+                resources.displayMetrics
+            )
+
             canvas.save()
             canvas.rotate(angle, rawTextX, adjustedTextY)
-            canvas.drawText(bpmValue.toString(), rawTextX, adjustedTextY, paintText)
+            canvas.drawText(bpmValue.toString(), rawTextX, adjustedTextY - offsetAboveArc, paintText)
             canvas.restore()
+
         }
 
         canvas.restore()
