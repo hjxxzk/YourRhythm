@@ -4,5 +4,5 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.ViewModel
 
 class HeartRateViewModel : ViewModel() {
-    val heartRate: LiveData<Float> = HeartRateRepository.heartRateLiveData
+    val heartRateEvent: LiveData<HeartRateEvent> = HeartRateRepository.heartRateLiveData
 }

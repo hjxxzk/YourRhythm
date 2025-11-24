@@ -112,6 +112,7 @@ class OnboardingActivity : AppCompatActivity() {
 
     private fun completeOnboarding() {
         OnboardingManager.setOnboardingCompleted(this)
+        Preferences.saveIndex(this, 5.toString())
         startActivity(Intent(this, MainActivity::class.java))
         finish()
     }

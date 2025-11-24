@@ -46,6 +46,11 @@
         <item name="android:textColor">#FFFFFF</item>
     </style>
 
+    <style name="username">
+        <item name="android:textSize">21sp</item>
+        <item name="android:textColor">#2E2D31</item>
+    </style>
+
     <style name="set_up">
         <item name="android:textSize">33sp</item>
         <item name="android:textColor">#FFFFFF</item>
@@ -54,6 +59,55 @@
     <style name="RoundedImageView">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">5dp</item>
+    </style>
+
+    <style name="settings">
+        <item name="android:textSize">21sp</item>
+        <item name="android:textColor">#2E2D31</item>
+    </style>
+
+    <style name="clear_data">
+        <item name="android:textSize">21sp</item>
+        <item name="android:textColor">#EF4444</item>
+    </style>
+
+    <style name="change_user">
+        <item name="android:textSize">21sp</item>
+        <item name="android:textColor">#2E2D31</item>
+    </style>
+
+    <style name="genre_settings">
+        <item name="android:textSize">19sp</item>
+    </style>
+
+    <style name="number">
+        <item name="android:textSize">28sp</item>
+        <item name="android:textColor">#000000</item>
+    </style>
+
+    <style name="note_accura">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">#000000</item>
+    </style>
+
+    <style name="warning">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">#000000</item>
+    </style>
+
+    <style name="no_device_c">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">#000000</item>
+    </style>
+
+    <style name="ok">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">#000000</item>
+    </style>
+
+    <style name="MySmallDialog" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="android:windowMinWidthMajor">0%</item>
+        <item name="android:windowMinWidthMinor">0%</item>
     </style>
 
 </resources>

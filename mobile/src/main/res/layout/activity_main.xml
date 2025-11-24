@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<androidx.drawerlayout.widget.DrawerLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/drawerLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -10,8 +16,8 @@
 
     <ImageView
         android:id="@+id/icon_left"
-        android:layout_width="22dp"
-        android:layout_height="22dp"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
         android:src="@drawable/ic_left"
         android:contentDescription="Left icon"
         app:layout_constraintTop_toTopOf="parent"
@@ -22,8 +28,8 @@
     <!-- ikonka po prawej  -->
     <ImageView
         android:id="@+id/icon_right"
-        android:layout_width="22dp"
-        android:layout_height="22dp"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
         android:src="@drawable/ic_right"
         android:contentDescription="Right icon"
         app:layout_constraintTop_toTopOf="parent"
@@ -99,3 +105,31 @@
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <LinearLayout
+        android:id="@+id/leftDrawer"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:orientation="vertical"
+        android:background="#FCFCFC"
+        android:layout_weight="1" >
+
+        <include layout="@layout/left_drawer" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/rightDrawer"
+        android:layout_width="280dp"
+        android:layout_height="match_parent"
+        android:background="#FFFFFF"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:layout_gravity="end">
+
+        <include layout="@layout/right_drawer" />
+    </LinearLayout>
+
+</androidx.drawerlayout.widget.DrawerLayout>

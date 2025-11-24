@@ -2,16 +2,22 @@ package com.pwr.yourrhythm
 
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
+import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Bundle
+import android.os.Looper
 import android.util.Base64
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.view.animation.LinearInterpolator
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.pwr.yourrhythm.fetchMusicService.SpotifyAuthManager
 import com.pwr.yourrhythm.fetchMusicService.FindSongService
@@ -32,9 +38,14 @@ import org.json.JSONObject
 import java.io.IOException
 import kotlinx.coroutines.*
 import androidx.core.content.edit
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.google.android.gms.wearable.Node
+import com.google.android.gms.wearable.Wearable
+import com.pwr.yourrhythm.Preferences.getUsername
 import com.pwr.yourrhythm.security.TokenEncryptionHelper.saveAccessToken
 import com.pwr.yourrhythm.theme.CurveProgressView
 import com.pwr.yourrhythm.theme.SongAdapter
@@ -61,6 +72,9 @@ class MainActivity : AppCompatActivity() {
     private var isPlaying = true
     private var currentlyPlayingTrackId: String? = null
     private lateinit var rotationAnimator: ObjectAnimator
+    private var isPopupVisible = false
+    private var connectedDevices = mutableListOf<Node>()
+    private var watchIndex = 0
 
 
     data class Song(
@@ -69,7 +83,6 @@ class MainActivity : AppCompatActivity() {
         var trackId: String,
         var img: String
     )
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -89,11 +102,15 @@ class MainActivity : AppCompatActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
 
+        VOLATILITY_THRESHOLD = Preferences.getIndex(this).toFloat()
+
         swipeRefresh = findViewById(R.id.swipeRefresh)
 
         swipeRefresh.setOnRefreshListener {
             refreshSongsManually()
         }
+
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val logo = findViewById<ImageView>(R.id.logo)
 
@@ -105,23 +122,65 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        val leftDrawer = findViewById<View>(R.id.leftDrawer)
+        val leftParams = leftDrawer.layoutParams
+        leftParams.width = (resources.displayMetrics.widthPixels * 0.75).toInt()
+        leftDrawer.layoutParams = leftParams
+
+        findViewById<ImageView>(R.id.icon_left).setOnClickListener {
+            val drawerLayout = findViewById<DrawerLayout>(R.id.drawerLayout)
+            drawerLayout.openDrawer(GravityCompat.START)
+        }
+
+        val drawerRight = findViewById<View>(R.id.rightDrawer)
+        val paramsRight = drawerRight.layoutParams
+        paramsRight.width = (resources.displayMetrics.widthPixels * 0.75).toInt()
+        drawerRight.layoutParams = paramsRight
+
+        findViewById<ImageView>(R.id.icon_right).setOnClickListener {
+            val drawerLayout = findViewById<DrawerLayout>(R.id.drawerLayout)
+            drawerLayout.openDrawer(GravityCompat.END)
+        }
+
+
+        val usernameText = findViewById<TextView>(R.id.username)
+        usernameText.text = getUsername(this)
+
+        val settingsButton = findViewById<TextView>(R.id.settings_text)
+        val drawerLayout = findViewById<DrawerLayout>(R.id.drawerLayout)
+
+        settingsButton.setOnClickListener {
+            drawerLayout.closeDrawer(GravityCompat.START)
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
         val curveProgress = findViewById<CurveProgressView>(R.id.curveProgress)
         spotifyAuthManager = SpotifyAuthManager()
         findSongService = FindSongService()
+
+        android.os.Handler(Looper.getMainLooper()).postDelayed({
+            if (heartRate == 0F && !isPopupVisible) {
+                isPopupVisible = true
+                showWatchPopup()
+            }
+        }, 3000)
 
         // 1. Autoryzacja Spotify
         authenticateSpotify()
         //3. Połaczenie się z zgearkiem
         bpmText = findViewById(R.id.bpm)
         // 2. Odebranie danych z zegarka
-        heartRateViewModel.heartRate.observe(this) { value ->
-            if (value != null && value > 0f) {
-                curveProgress.setProgress(value / 200F)
-                curveProgress.setBpm(value.toInt())
+        heartRateViewModel.heartRateEvent.observe(this) { value ->
+            if (value != null && value.heartRate > 0f &&
+                connectedDevices.isNotEmpty() &&
+                value.senderId == connectedDevices[watchIndex].id) {
 
-                if(shouldSongChange(value) && isSpotifyConnected) {
+                curveProgress.setProgress(value.heartRate / 200F)
+                curveProgress.setBpm(value.heartRate.toInt())
 
-                    findSongService.getSongsByBpm(this, value, apiKey) { songs ->
+                if(shouldSongChange(value.heartRate) && isSpotifyConnected) {
+
+                    findSongService.getSongsByBpm(this, value.heartRate, apiKey) { songs ->
                         songsList.clear()
                         songsList.addAll(songs)
                         fetchAlbumImages(songsList)
@@ -133,7 +192,7 @@ class MainActivity : AppCompatActivity() {
                             findSongService.searchTrackOnSpotify(firstSong.title, firstSong.artist, accessToken) { trackData ->
                                 if (trackData != null) {
                                     firstSong.trackId = trackData.trackId
-                                    updateUIOnSongChange(value.toInt(), songs)
+                                    updateUIOnSongChange(value.heartRate.toInt(), songs)
                                     playTrack(firstSong)
                                     isPlaying = true
 
@@ -163,6 +222,91 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val usernameText = findViewById<TextView>(R.id.username)
+        usernameText.text = getUsername(this)
+        VOLATILITY_THRESHOLD = Preferences.getIndex(this).toFloat()
+
+        checkWatchConnection(this) { isConnected ->
+            if (!isConnected && !isPopupVisible) {
+                isPopupVisible = true
+                val watch = findViewById<TextView>(R.id.watch)
+                watch.text = "-"
+                findViewById<View>(R.id.status_icon).visibility = View.GONE
+                findViewById<ImageView>(R.id.watchImg).visibility = View.GONE
+                val status = findViewById<TextView>(R.id.status)
+                status.text = "-"
+                showWatchPopup()
+            } else {
+                getConnectedWatches(this) { nodes ->
+                    if (nodes != null) {
+                        connectedDevices = nodes as MutableList<Node>
+                        val watch = findViewById<TextView>(R.id.watch)
+                        watch.text = nodes[0].displayName
+
+                        if(connectedDevices.size > 1) {
+                            allowScrolling()
+                        } else {
+                            disableScrolling()
+                        }
+                    }
+                }
+            }
+        }
+
+        checkWifiConnection(this) { isWifiConnected ->
+            if (!isWifiConnected && !isPopupVisible) {
+                isPopupVisible = true
+                showWifiPopup()
+            }
+        }
+    }
+
+    private fun disableScrolling() {
+        findViewById<ImageView>(R.id.arrowLeft).visibility = View.GONE
+        findViewById<ImageView>(R.id.arrowRight).visibility = View.GONE
+        findViewById<ImageView>(R.id.leftWatch).visibility = View.GONE
+        findViewById<ImageView>(R.id.rightWatch).visibility = View.GONE
+    }
+
+    private fun allowScrolling() {
+        findViewById<ImageView>(R.id.arrowLeft).setOnClickListener { scrollLeft() }
+        findViewById<ImageView>(R.id.arrowRight).setOnClickListener { scrollRight() }
+
+        updateWatchUi()
+    }
+
+    private fun scrollRight() {
+        if (watchIndex < connectedDevices.size - 1) {
+            watchIndex++
+            updateWatchUi()
+        }
+    }
+
+    private fun scrollLeft() {
+        if (watchIndex > 0) {
+            watchIndex--
+            updateWatchUi()
+        }
+    }
+
+    private fun updateWatchUi() {
+        val watchText = findViewById<TextView>(R.id.watch)
+        val left = findViewById<ImageView>(R.id.leftWatch)
+        val right = findViewById<ImageView>(R.id.rightWatch)
+        val leftArrow = findViewById<ImageView>(R.id.arrowLeft)
+        val rightArrow = findViewById<ImageView>(R.id.arrowRight)
+
+        watchText.text = connectedDevices[watchIndex].displayName
+
+        left.visibility = if (watchIndex == 0) View.GONE else View.VISIBLE
+        right.visibility = if (watchIndex == connectedDevices.size - 1) View.GONE else View.VISIBLE
+
+        leftArrow.visibility = if (watchIndex == 0) View.GONE else View.VISIBLE
+        rightArrow.visibility = if (watchIndex == connectedDevices.size - 1) View.GONE else View.VISIBLE
     }
 
 
@@ -343,11 +487,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
-
     // SHOULD STOP ALGORITHM
     private var volatilityIndex : Float = 0F
-    private val VOLATILITY_THRESHOLD = 5F
+    private var VOLATILITY_THRESHOLD : Float = 0F
 
     fun shouldSongChange(newHeartRate : Float) : Boolean {
         if(isFirstHeartRateMeasurement()) {
@@ -375,5 +517,77 @@ class MainActivity : AppCompatActivity() {
             return true
         }
         return false
+    }
+
+    // POP UPS
+
+    fun checkWatchConnection(context: Context, callback: (Boolean) -> Unit) {
+        Wearable.getNodeClient(context).connectedNodes
+            .addOnSuccessListener { nodes ->
+                callback(nodes.isNotEmpty())
+            }
+            .addOnFailureListener {
+                callback(false)
+            }
+    }
+
+    private fun showWatchPopup() {
+        val view = layoutInflater.inflate(R.layout.no_device_popup, null)
+
+        val dialog = AlertDialog.Builder(this, R.style.MySmallDialog)
+            .setView(view)
+            .create()
+
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        view.findViewById<TextView>(R.id.ok).setOnClickListener {
+            isPopupVisible = false
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
+    fun checkWifiConnection(context: Context, callback: (Boolean) -> Unit) {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: run { callback(false); return }
+        val capabilities = cm.getNetworkCapabilities(network) ?: run { callback(false); return }
+
+        val online = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+
+        callback(online)
+    }
+
+    private fun showWifiPopup() {
+        val view = layoutInflater.inflate(R.layout.no_wifi_popup, null)
+
+        val dialog = AlertDialog.Builder(this, R.style.MySmallDialog)
+            .setView(view)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        view.findViewById<TextView>(R.id.ok).setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
+    // CONNECTED DEVICES
+    fun getConnectedWatches(context: Context, callback: (List<Node>?) -> Unit) {
+        Wearable.getNodeClient(context).connectedNodes
+            .addOnSuccessListener { nodes ->
+                if (nodes.isNotEmpty()) {
+                    callback(nodes)
+                } else {
+                    callback(null)
+                }
+            }
+            .addOnFailureListener {
+                callback(null)
+            }
     }
 }

@@ -8,11 +8,14 @@ class HeartRateListenerService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         if (messageEvent.path == "/heartrate") {
-            val heartRate = String(messageEvent.data).toFloatOrNull()
 
+            val heartRate = String(messageEvent.data).toFloatOrNull()
+            val senderId = messageEvent.sourceNodeId
 
             if (heartRate != null) {
-                HeartRateRepository.heartRateLiveData.postValue(heartRate)
+                HeartRateRepository.heartRateLiveData.postValue(
+                    HeartRateEvent(heartRate, senderId)
+                )
             }
 
         } else {
